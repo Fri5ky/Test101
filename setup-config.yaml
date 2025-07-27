@@ -1,0 +1,29 @@
+﻿# user-data for Ubuntu 24.04 Desktop unattended installation
+autoinstall:
+  version: 1
+  identity:
+    hostname: NxWitness
+    username: user
+    password: admin12345
+  locale: en_US
+  keyboard:
+    layout: us
+  network:
+    version: 2
+    ethernets:
+      id0:
+        match:
+          name: en*  # More reliable way to match Ethernet interfaces
+        dhcp4: true
+  storage:
+    layout:
+      name: direct  # Uses entire disk automatically
+  packages:
+    - wget
+    - gnome-software
+    - gnome-tweaks
+  late-commands:
+    - curtin in-target -- mkdir -p /opt/setup
+    - until curtin in-target -- wget -O /opt/setup/postinstall.sh https://raw.githubusercontent.com/Fri5ky/Test101/main/script1.sh; do sleep 2; done
+    - curtin in-target -- chmod +x /opt/setup/postinstall.sh
+    - curtin in-target -- bash /opt/setup/postinstall.sh
