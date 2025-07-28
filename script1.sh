@@ -1,92 +1,105 @@
 #!/bin/bash
 
 # ===== SETUP =====
-# Define password variable
 PASSWORD='admin12345'
-
-# Set APT to non-interactive mode (avoid GUI or pink screens)
 export DEBIAN_FRONTEND=noninteractive
 
-# Optional: Pre-accept license if required (usually not needed, but safe)
+# Detect the real logged-in user (not root)
+LOGGED_IN_USER=$(logname)
+USER_HOME=$(eval echo "~$LOGGED_IN_USER")
+
+# Accept EULA for Nx Witness Server
 echo "nxwitness-server nxwitness-server/accept-eula boolean true" | sudo debconf-set-selections
 
-# ===== DOWNLOADS =====
-# Download TeamViewer
-wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
+# ===== CREATE DOWNLOADS DIRECTORY =====
+mkdir -p downloads
 
-# Download Nx Witness Client (v6.0.5.41290)
-wget https://updates.networkoptix.com/default/41290/linux/nxwitness-client-6.0.5.41290-linux_x64.deb
+# ===== TEAMVIEWER INSTALL =====
+TEAMVIEWER_DEB="downloads/teamviewer_amd64.deb"
+if [ ! -f "$TEAMVIEWER_DEB" ]; then
+    wget -O "$TEAMVIEWER_DEB" https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
+fi
+sudo apt install -y ./"$TEAMVIEWER_DEB" && rm -f "$TEAMVIEWER_DEB"
 
-# Download Nx Witness Server (v6.0.5.41290)
-wget https://updates.networkoptix.com/default/41290/linux/nxwitness-server-6.0.5.41290-linux_x64.deb
+# ===== NX WITNESS CLIENT INSTALL =====
+NX_CLIENT_DEB="downloads/nxwitness-client-6.0.5.41290-linux_x64.deb"
+if [ ! -f "$NX_CLIENT_DEB" ]; then
+    wget -O "$NX_CLIENT_DEB" https://updates.networkoptix.com/default/41290/linux/nxwitness-client-6.0.5.41290-linux_x64.deb
+fi
+sudo apt install -y ./"$NX_CLIENT_DEB" && rm -f "$NX_CLIENT_DEB"
 
-# ===== SYSTEM UPDATES =====
-# Update package list
+# ===== NX WITNESS SERVER INSTALL =====
+NX_SERVER_DEB="downloads/nxwitness-server-6.0.5.41290-linux_x64.deb"
+if [ ! -f "$NX_SERVER_DEB" ]; then
+    wget -O "$NX_SERVER_DEB" https://updates.networkoptix.com/default/41290/linux/nxwitness-server-6.0.5.41290-linux_x64.deb
+fi
+sudo apt install -y ./"$NX_SERVER_DEB" && rm -f "$NX_SERVER_DEB"
+
+# ===== SYSTEM SETUP =====
 echo "$PASSWORD" | sudo -S apt-get update
-
-# Upgrade all packages
 echo "$PASSWORD" | sudo -S apt-get upgrade -y
-
-# Install all recommended drivers
 echo "$PASSWORD" | sudo -S ubuntu-drivers autoinstall
 
-# ===== INSTALL SOFTWARE =====
-# Install TeamViewer
-echo "$PASSWORD" | sudo -S apt install -y ./teamviewer_amd64.deb
-
-# Install Nx Witness Client (non-interactive)
-echo "$PASSWORD" | sudo -S DEBIAN_FRONTEND=noninteractive apt install -y ./nxwitness-client-6.0.5.41290-linux_x64.deb
-
-# Install Nx Witness Server (non-interactive)
-echo "$PASSWORD" | sudo -S DEBIAN_FRONTEND=noninteractive apt install -y ./nxwitness-server-6.0.5.41290-linux_x64.deb
+# Install required packages
+echo "$PASSWORD" | sudo -S apt install -y dbus-x11 dconf-cli gsettings-desktop-schemas gnome-settings-daemon gnome-software
 
 # ===== DISPLAY SERVER CONFIG =====
-# Uncomment WaylandEnable in GDM config
 echo "$PASSWORD" | sudo -S sed -i 's/^#\s*WaylandEnable=false/WaylandEnable=false/' /etc/gdm3/custom.conf
-
-# Confirm it was applied
 grep '^WaylandEnable=' /etc/gdm3/custom.conf
 
-# ===== GNOME UX TWEAKS =====
-# Disable notifications
+# ===== CREATE GNOME SETTINGS SCRIPT FOR USER TO RUN ON LOGIN =====
+
+sudo tee /usr/local/bin/gnome-setup.sh > /dev/null <<'EOF'
+#!/bin/bash
+
 gsettings set org.gnome.desktop.notifications show-banners false
 gsettings set org.gnome.desktop.notifications show-in-lock-screen false
-
-# Prevent suspend
 gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
-
-# Disable screen blanking / power save
 gsettings set org.gnome.desktop.session idle-delay 0
 gsettings set org.gnome.desktop.screensaver lock-enabled false
 gsettings set org.gnome.desktop.screensaver idle-activation-enabled false
-
-# Enable dark mode
 gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark'
-
-# ===== PRIVACY / SCREEN LOCK =====
-# Never lock screen automatically
 gsettings set org.gnome.desktop.screensaver lock-delay 0
 gsettings set org.gnome.desktop.lockdown disable-lock-screen true
 gsettings set org.gnome.desktop.lockdown disable-user-switching true
-
-# Disable screen lock when idle
 gsettings set org.gnome.desktop.privacy report-technical-problems false
 gsettings set org.gnome.desktop.privacy remember-recent-files false
 gsettings set org.gnome.desktop.privacy send-software-usage-stats false
 gsettings set org.gnome.desktop.privacy old-files-age 0
 gsettings set org.gnome.desktop.privacy recent-files-max-age 0
+gsettings set org.gnome.software download-updates false
+gsettings set org.gnome.software allow-updates false
+
+rm -f ~/.config/autostart/gnome-setup.desktop
+EOF
+
+sudo chmod +x /usr/local/bin/gnome-setup.sh
+sudo chown "$LOGGED_IN_USER":"$LOGGED_IN_USER" /usr/local/bin/gnome-setup.sh
+
+AUTOSTART_DIR="$USER_HOME/.config/autostart"
+sudo -u "$LOGGED_IN_USER" mkdir -p "$AUTOSTART_DIR"
+
+cat <<EOF | sudo -u "$LOGGED_IN_USER" tee "$AUTOSTART_DIR/gnome-setup.desktop" > /dev/null
+[Desktop Entry]
+Type=Application
+Exec=/usr/local/bin/gnome-setup.sh
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=GNOME Auto Tweaks
+EOF
 
 # ===== DISABLE AUTO UPDATES =====
-# Stop APT from checking for updates automatically
 echo "$PASSWORD" | sudo -S sed -i 's/APT::Periodic::Update-Package-Lists "1";/APT::Periodic::Update-Package-Lists "0";/' /etc/apt/apt.conf.d/20auto-upgrades
 echo "$PASSWORD" | sudo -S sed -i 's/APT::Periodic::Download-Upgradeable-Packages "1";/APT::Periodic::Download-Upgradeable-Packages "0";/' /etc/apt/apt.conf.d/20auto-upgrades
 echo "$PASSWORD" | sudo -S sed -i 's/APT::Periodic::AutocleanInterval "1";/APT::Periodic::AutocleanInterval "0";/' /etc/apt/apt.conf.d/10periodic
 
-# Disable unattended-upgrades
 echo "$PASSWORD" | sudo -S systemctl stop unattended-upgrades
 echo "$PASSWORD" | sudo -S systemctl disable unattended-upgrades
 
-# Disable GNOME Software auto-updates (GUI)
-gsettings set org.gnome.software download-updates false
-gsettings set org.gnome.software allow-updates false
+# ===== REBOOT =====
+echo "✅ Script completed successfully."
+echo "Rebooting in 10 seconds... Press Ctrl+C to cancel."
+sleep 10
+sudo reboot
