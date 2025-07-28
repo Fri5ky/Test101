@@ -35,6 +35,18 @@ if [ ! -f "$NX_SERVER_DEB" ]; then
 fi
 sudo apt install -y ./"$NX_SERVER_DEB" && rm -f "$NX_SERVER_DEB"
 
+# ===== WALLPAPER DOWNLOAD =====
+WALLPAPER_URL="http://10.247.43.131/w.png"
+DOWNLOADS_DIR="downloads"
+WALLPAPER_PATH="$DOWNLOADS_DIR/w.png"
+
+if [ ! -f "$WALLPAPER_PATH" ]; then
+    wget -O "$WALLPAPER_PATH" "$WALLPAPER_URL"
+    echo "✅ Wallpaper downloaded to $WALLPAPER_PATH"
+else
+    echo "Wallpaper already downloaded at $WALLPAPER_PATH"
+fi
+
 # ===== SYSTEM SETUP =====
 echo "$PASSWORD" | sudo -S apt-get update
 echo "$PASSWORD" | sudo -S apt-get upgrade -y
