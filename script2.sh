@@ -261,6 +261,13 @@ for DRIVE in /dev/sd? /dev/nvme?n?p?; do
     ((INDEX++))
 done
 
+# ===== FINAL CLEANUP =====
+echo "$PASSWORD" | sudo -S apt-get -y autoremove
+echo "$PASSWORD" | sudo -S apt-get -y clean
+echo "$PASSWORD" | sudo -S rm -rf /var/lib/apt/lists/*
+echo "$PASSWORD" | sudo -S rm -f /var/crash/*
+echo "$PASSWORD" | sudo -S systemctl stop apport.service
+
 # ===== RUN CMATRIX EFFECT =====
 if command -v cmatrix &> /dev/null; then
     echo "Launching Matrix effect! Press Ctrl+C to exit."
