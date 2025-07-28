@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#VER.1
 # ===== SETUP =====
 PASSWORD='admin12345'
 export DEBIAN_FRONTEND=noninteractive
