@@ -41,7 +41,7 @@ echo "$PASSWORD" | sudo -S apt-get upgrade -y
 echo "$PASSWORD" | sudo -S ubuntu-drivers autoinstall
 
 # Install required packages
-echo "$PASSWORD" | sudo -S apt install -y dbus-x11 dconf-cli gsettings-desktop-schemas gnome-settings-daemon gnome-software
+echo "$PASSWORD" | sudo -S apt install -y dbus-x11 dconf-cli gsettings-desktop-schemas gnome-settings-daemon gnome-software cmatrix
 
 # ===== DISPLAY SERVER CONFIG =====
 echo "$PASSWORD" | sudo -S sed -i 's/^#\s*WaylandEnable=false/WaylandEnable=false/' /etc/gdm3/custom.conf
@@ -88,8 +88,16 @@ echo "$PASSWORD" | sudo -S sed -i 's/APT::Periodic::AutocleanInterval "1";/APT::
 echo "$PASSWORD" | sudo -S systemctl stop unattended-upgrades
 echo "$PASSWORD" | sudo -S systemctl disable unattended-upgrades
 
+# ===== RUN CMATRIX EFFECT =====
+if command -v cmatrix &> /dev/null; then
+    echo "Launching Matrix effect! Press Ctrl+C to exit."
+    cmatrix
+else
+    echo "cmatrix is not installed."
+fi
+
 # ===== REBOOT =====
-echo "✅ Script completed successfully."
+echo "✅ Matrix completed successfully."
 echo "Rebooting in 10 seconds... Press Ctrl+C to cancel."
 sleep 10
 sudo reboot
