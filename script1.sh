@@ -35,18 +35,6 @@ if [ ! -f "$NX_SERVER_DEB" ]; then
 fi
 sudo apt install -y ./"$NX_SERVER_DEB" && rm -f "$NX_SERVER_DEB"
 
-# ===== WALLPAPER DOWNLOAD =====
-WALLPAPER_URL="http://10.247.43.131/w.png"
-DOWNLOADS_DIR="downloads"
-WALLPAPER_PATH="$DOWNLOADS_DIR/w.png"
-
-if [ ! -f "$WALLPAPER_PATH" ]; then
-    wget -O "$WALLPAPER_PATH" "$WALLPAPER_URL"
-    echo "✅ Wallpaper downloaded to $WALLPAPER_PATH"
-else
-    echo "Wallpaper already downloaded at $WALLPAPER_PATH"
-fi
-
 # ===== SYSTEM SETUP =====
 echo "$PASSWORD" | sudo -S apt-get update
 echo "$PASSWORD" | sudo -S apt-get upgrade -y
@@ -59,14 +47,25 @@ echo "$PASSWORD" | sudo -S apt install -y dbus-x11 dconf-cli gsettings-desktop-s
 echo "$PASSWORD" | sudo -S sed -i 's/^#\s*WaylandEnable=false/WaylandEnable=false/' /etc/gdm3/custom.conf
 grep '^WaylandEnable=' /etc/gdm3/custom.conf
 
-# ===== CREATE GNOME SETTINGS SCRIPT FOR USER TO RUN ON LOGIN =====
+# ===== SET POWER PROFILE TO HIGH PERFORMANCE =====
+if command -v powerprofilesctl &> /dev/null; then
+    powerprofilesctl set performance
+fi
 
-sudo tee /usr/local/bin/gnome-setup.sh > /dev/null <<'EOF'
-#!/bin/bash
+# ===== POWER SETTINGS =====
+gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
+gsettings set org.gnome.settings-daemon.plugins.power idle-brightness 100
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 3600
+gsettings set org.gnome.settings-daemon.plugins.power lid-close-ac-action 'nothing'
+gsettings set org.gnome.settings-daemon.plugins.power lid-close-battery-action 'nothing'
 
+# Disable any action on physical power button press
+gsettings set org.gnome.settings-daemon.plugins.power power-button-action 'nothing'
+
+# ===== GNOME UX TWEAKS =====
 gsettings set org.gnome.desktop.notifications show-banners false
 gsettings set org.gnome.desktop.notifications show-in-lock-screen false
-gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
 gsettings set org.gnome.desktop.session idle-delay 0
 gsettings set org.gnome.desktop.screensaver lock-enabled false
 gsettings set org.gnome.desktop.screensaver idle-activation-enabled false
@@ -80,27 +79,6 @@ gsettings set org.gnome.desktop.privacy remember-recent-files false
 gsettings set org.gnome.desktop.privacy send-software-usage-stats false
 gsettings set org.gnome.desktop.privacy old-files-age 0
 gsettings set org.gnome.desktop.privacy recent-files-max-age 0
-gsettings set org.gnome.software download-updates false
-gsettings set org.gnome.software allow-updates false
-
-rm -f ~/.config/autostart/gnome-setup.desktop
-EOF
-
-sudo chmod +x /usr/local/bin/gnome-setup.sh
-sudo chown "$LOGGED_IN_USER":"$LOGGED_IN_USER" /usr/local/bin/gnome-setup.sh
-
-AUTOSTART_DIR="$USER_HOME/.config/autostart"
-sudo -u "$LOGGED_IN_USER" mkdir -p "$AUTOSTART_DIR"
-
-cat <<EOF | sudo -u "$LOGGED_IN_USER" tee "$AUTOSTART_DIR/gnome-setup.desktop" > /dev/null
-[Desktop Entry]
-Type=Application
-Exec=/usr/local/bin/gnome-setup.sh
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-Name=GNOME Auto Tweaks
-EOF
 
 # ===== DISABLE AUTO UPDATES =====
 echo "$PASSWORD" | sudo -S sed -i 's/APT::Periodic::Update-Package-Lists "1";/APT::Periodic::Update-Package-Lists "0";/' /etc/apt/apt.conf.d/20auto-upgrades
