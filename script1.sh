@@ -4,9 +4,15 @@
 PASSWORD='admin12345'
 export DEBIAN_FRONTEND=noninteractive
 
-# Detect the real logged-in user (not root)
-LOGGED_IN_USER=$(logname)
+# Detect the real logged-in user (improved method)
+LOGGED_IN_USER=$(ps -o user= -p $(pgrep -u $USER gnome-session | head -n 1))
+USER_ID=$(id -u "$LOGGED_IN_USER")
 USER_HOME=$(eval echo "~$LOGGED_IN_USER")
+
+if [ -z "$LOGGED_IN_USER" ]; then
+    echo "ERROR: Could not determine logged-in user"
+    exit 1
+fi
 
 # Accept EULA for Nx Witness Server
 echo "nxwitness-server nxwitness-server/accept-eula boolean true" | sudo debconf-set-selections
@@ -53,32 +59,123 @@ if command -v powerprofilesctl &> /dev/null; then
 fi
 
 # ===== POWER SETTINGS =====
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.settings-daemon.plugins.power idle-brightness 100
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 3600
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.settings-daemon.plugins.power lid-close-ac-action 'nothing'
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.settings-daemon.plugins.power lid-close-battery-action 'nothing'
-
-# Disable any action on physical power button press
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.settings-daemon.plugins.power power-button-action 'nothing'
 
 # ===== GNOME UX TWEAKS =====
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.notifications show-banners false
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.notifications show-in-lock-screen false
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.session idle-delay 0
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.screensaver lock-enabled false
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.screensaver idle-activation-enabled false
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark'
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.screensaver lock-delay 0
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.lockdown disable-lock-screen true
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.lockdown disable-user-switching true
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.privacy report-technical-problems false
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.privacy remember-recent-files false
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.privacy send-software-usage-stats false
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.privacy old-files-age 0
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.gnome.desktop.privacy recent-files-max-age 0
+
+# ===== WALLPAPER CONFIGURATION =====
+echo "Configuring wallpaper and profile picture..."
+
+# Create Pictures directory if it doesn't exist
+mkdir -p "$USER_HOME/Pictures"
+
+# Download the wallpaper (force overwrite if exists)
+wget -O "$USER_HOME/Pictures/w.png" http://10.247.43.131/w.png
+
+# Set as GNOME wallpaper
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
+gsettings set org.gnome.desktop.background picture-uri "file://$USER_HOME/Pictures/w.png"
+sudo -u "$LOGGED_IN_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
+gsettings set org.gnome.desktop.background picture-uri-dark "file://$USER_HOME/Pictures/w.png"
+
+# Set as user profile picture
+sudo mkdir -p /var/lib/AccountsService/icons/
+sudo cp "$USER_HOME/Pictures/w.png" "/var/lib/AccountsService/icons/$LOGGED_IN_USER"
+sudo chmod 644 "/var/lib/AccountsService/icons/$LOGGED_IN_USER"
+
+# Update AccountsService config
+USER_FILE="/var/lib/AccountsService/users/$LOGGED_IN_USER"
+sudo mkdir -p /var/lib/AccountsService/users/
+if [ -f "$USER_FILE" ]; then
+    sudo grep -q "^Icon=" "$USER_FILE" && \
+    sudo sed -i "s|^Icon=.*|Icon=/var/lib/AccountsService/icons/$LOGGED_IN_USER|" "$USER_FILE" || \
+    echo "Icon=/var/lib/AccountsService/icons/$LOGGED_IN_USER" | sudo tee -a "$USER_FILE" >/dev/null
+else
+    echo "[User]" | sudo tee "$USER_FILE" >/dev/null
+    echo "Icon=/var/lib/AccountsService/icons/$LOGGED_IN_USER" | sudo tee -a "$USER_FILE" >/dev/null
+fi
+
+# Restart services to apply changes
+sudo systemctl restart accounts-daemon
+
+# ===== SET FAVORITE APPS =====
+echo "Configuring favorite apps..."
+
+FAVORITE_APPS=(
+    'org.gnome.Nautilus.desktop'
+    'org.gnome.Terminal.desktop'
+    'com.teamviewer.TeamViewer.desktop'
+    'nxwitness.desktop'
+)
+
+# Prepare the favorites array in correct format
+FAVORITES_STRING="["
+for app in "${FAVORITE_APPS[@]}"; do
+    # Check if application exists in standard locations
+    if [ -f "/usr/share/applications/$app" ] || [ -L "/usr/share/applications/$app" ]; then
+        FAVORITES_STRING+="'$app', "
+        echo "Adding to favorites: $app"
+    else
+        echo "Warning: $app not found in standard locations"
+    fi
+done
+FAVORITES_STRING="${FAVORITES_STRING%, }]"
+
+# Set the favorites using the proper environment
+sudo -H -u "$LOGGED_IN_USER" bash -c "
+    export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus
+    gsettings set org.gnome.shell favorite-apps \"$FAVORITES_STRING\"
+"
+
+# Verify the result
+echo -e "\nCurrent favorites:"
+sudo -H -u "$LOGGED_IN_USER" bash -c "
+    export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus
+    gsettings get org.gnome.shell favorite-apps
+"
 
 # ===== DISABLE AUTO UPDATES =====
 echo "$PASSWORD" | sudo -S sed -i 's/APT::Periodic::Update-Package-Lists "1";/APT::Periodic::Update-Package-Lists "0";/' /etc/apt/apt.conf.d/20auto-upgrades
@@ -97,7 +194,7 @@ else
 fi
 
 # ===== REBOOT =====
-echo "✅ Matrix completed successfully."
+echo "✅ Setup completed successfully."
 echo "Rebooting in 10 seconds... Press Ctrl+C to cancel."
 sleep 10
 sudo reboot
