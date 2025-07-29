@@ -5,8 +5,8 @@
 PASSWORD='admin12345'
 export DEBIAN_FRONTEND=noninteractive
 
-# Detect the real logged-in user (improved method)
-LOGGED_IN_USER=$(ps -o user= -p $(pgrep -u $USER gnome-session | head -n 1))
+# Updated user detection method
+LOGGED_IN_USER=$(whoami)
 USER_ID=$(id -u "$LOGGED_IN_USER")
 USER_HOME=$(eval echo "~$LOGGED_IN_USER")
 
@@ -14,6 +14,7 @@ if [ -z "$LOGGED_IN_USER" ]; then
     echo "ERROR: Could not determine logged-in user"
     exit 1
 fi
+
 
 # Accept EULA for Nx Witness Server
 echo "nxwitness-server nxwitness-server/accept-eula boolean true" | sudo debconf-set-selections
@@ -198,16 +199,16 @@ format_and_mount_drive() {
     local LABEL=$3
 
     echo "Formatting $DRIVE as ext4..."
-    mkfs.ext4 -F -L "$LABEL" "$DRIVE"
+    sudo mkfs.ext4 -F -L "$LABEL" "$DRIVE"
 
     echo "Creating mount point: $MOUNTPOINT"
-    mkdir -p "$MOUNTPOINT"
+    sudo mkdir -p "$MOUNTPOINT"
 
     echo "Mounting $DRIVE to $MOUNTPOINT"
-    mount "$DRIVE" "$MOUNTPOINT"
+    sudo mount "$DRIVE" "$MOUNTPOINT"
 
-    UUID=$(blkid -s UUID -o value "$DRIVE")
-    echo "UUID=$UUID $MOUNTPOINT ext4 defaults,x-gvfs-show 0 2" >> /etc/fstab
+    UUID=$(sudo blkid -s UUID -o value "$DRIVE")
+    echo "UUID=$UUID $MOUNTPOINT ext4 defaults,x-gvfs-show 0 2" | sudo tee -a /etc/fstab > /dev/null
     echo "Drive $DRIVE mounted and labeled $LABEL, added to fstab."
 }
 
@@ -219,23 +220,22 @@ mount_formatted_drive() {
     local LABEL=$4
 
     echo "Creating mount point: $MOUNTPOINT"
-    mkdir -p "$MOUNTPOINT"
+    sudo mkdir -p "$MOUNTPOINT"
 
     echo "Mounting $DRIVE ($FSTYPE) to $MOUNTPOINT"
-    mount "$DRIVE" "$MOUNTPOINT"
+    sudo mount "$DRIVE" "$MOUNTPOINT"
 
-    # Only set label if ext4
     if [ "$FSTYPE" == "ext4" ]; then
         echo "Setting label to $LABEL"
-        e2label "$DRIVE" "$LABEL"
+        sudo e2label "$DRIVE" "$LABEL"
     fi
 
-    UUID=$(blkid -s UUID -o value "$DRIVE")
-    echo "UUID=$UUID $MOUNTPOINT $FSTYPE defaults,x-gvfs-show 0 2" >> /etc/fstab
+    UUID=$(sudo blkid -s UUID -o value "$DRIVE")
+    echo "UUID=$UUID $MOUNTPOINT $FSTYPE defaults,x-gvfs-show 0 2" | sudo tee -a /etc/fstab > /dev/null
     echo "Drive $DRIVE mounted and labeled $LABEL, added to fstab."
 }
 
-# Main loop: detect all physical drives
+# Updated mount detection loop
 INDEX=1
 for DRIVE in /dev/sd? /dev/nvme?n?p?; do
     if [ ! -b "$DRIVE" ]; then
@@ -248,7 +248,7 @@ for DRIVE in /dev/sd? /dev/nvme?n?p?; do
         continue
     fi
 
-    FSTYPE=$(blkid -o value -s TYPE "$DRIVE")
+    FSTYPE=$(sudo blkid -o value -s TYPE "$DRIVE")
     MOUNTPOINT="$MOUNT_BASE/disk$INDEX"
     LABEL="data$INDEX"
 
