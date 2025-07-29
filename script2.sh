@@ -261,6 +261,16 @@ for DRIVE in /dev/sd? /dev/nvme?n?p?; do
     ((INDEX++))
 done
 
+#====MSPLUGIN========#
+
+wget https://resource.milesight.com/milesight/security/software/Milesight_Plugin_for_Network_Optix_2.0.12-r2-linux.zip -O plugin.zip && \
+unzip plugin.zip && \
+cd Milesight_Plugin_for_Network_Optix_2.0.12-r2-linux && \
+unzip milesight_analytics_plugin_linux.zip && \
+cd milesight_analytics_plugin_linux && \
+chmod +x install.sh && \
+yes | sudo ./install.sh
+
 # ===== FINAL CLEANUP =====
 echo "$PASSWORD" | sudo -S apt-get -y autoremove
 echo "$PASSWORD" | sudo -S apt-get -y clean
