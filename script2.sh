@@ -187,10 +187,34 @@ echo "$PASSWORD" | sudo -S sed -i 's/APT::Periodic::AutocleanInterval "1";/APT::
 echo "$PASSWORD" | sudo -S systemctl stop unattended-upgrades
 echo "$PASSWORD" | sudo -S systemctl disable unattended-upgrades
 
-# ===== DRIVE CONFIGURATION =====
-echo "Starting drive configuration..."
+# ===== DRIVE CONFIG =====
 
+# Base mount point
 MOUNT_BASE="/mnt"
+
+# Minimum size threshold in GB
+MIN_SIZE_GB=500
+
+# Function to convert bytes to GB
+bytes_to_gb() {
+    echo $(($1 / 1024 / 1024 / 1024))
+}
+
+# Function to get drive size in bytes
+get_drive_size() {
+    local DRIVE=$1
+    sudo blockdev --getsize64 "$DRIVE"
+}
+
+# Function to safely add entry to /etc/fstab
+add_fstab_entry() {
+    local UUID=$1
+    local MOUNTPOINT=$2
+    local FSTYPE=$3
+    if ! grep -q "$UUID" /etc/fstab; then
+        echo "UUID=$UUID $MOUNTPOINT $FSTYPE defaults,x-gvfs-show,nofail 0 2" | sudo tee -a /etc/fstab > /dev/null
+    fi
+}
 
 # Function to format and mount a new drive
 format_and_mount_drive() {
@@ -208,7 +232,7 @@ format_and_mount_drive() {
     sudo mount "$DRIVE" "$MOUNTPOINT"
 
     UUID=$(sudo blkid -s UUID -o value "$DRIVE")
-    echo "UUID=$UUID $MOUNTPOINT ext4 defaults,x-gvfs-show 0 2" | sudo tee -a /etc/fstab > /dev/null
+    add_fstab_entry "$UUID" "$MOUNTPOINT" "ext4"
     echo "Drive $DRIVE mounted and labeled $LABEL, added to fstab."
 }
 
@@ -231,11 +255,11 @@ mount_formatted_drive() {
     fi
 
     UUID=$(sudo blkid -s UUID -o value "$DRIVE")
-    echo "UUID=$UUID $MOUNTPOINT $FSTYPE defaults,x-gvfs-show 0 2" | sudo tee -a /etc/fstab > /dev/null
+    add_fstab_entry "$UUID" "$MOUNTPOINT" "$FSTYPE"
     echo "Drive $DRIVE mounted and labeled $LABEL, added to fstab."
 }
 
-# Updated mount detection loop
+# Mount loop
 INDEX=1
 for DRIVE in /dev/sd? /dev/nvme?n?p?; do
     if [ ! -b "$DRIVE" ]; then
@@ -245,6 +269,20 @@ for DRIVE in /dev/sd? /dev/nvme?n?p?; do
     # Skip if already mounted
     if mount | grep -q "^$DRIVE"; then
         echo "$DRIVE is already mounted. Skipping."
+        continue
+    fi
+
+    # Skip if drive is root or boot
+    if findmnt -no SOURCE / | grep -q "$DRIVE"; then
+        echo "$DRIVE is root. Skipping."
+        continue
+    fi
+
+    # Check drive size
+    SIZE_BYTES=$(get_drive_size "$DRIVE")
+    SIZE_GB=$(bytes_to_gb "$SIZE_BYTES")
+    if [ "$SIZE_GB" -lt "$MIN_SIZE_GB" ]; then
+        echo "$DRIVE is smaller than $MIN_SIZE_GB GB ($SIZE_GB GB). Skipping."
         continue
     fi
 
@@ -261,7 +299,7 @@ for DRIVE in /dev/sd? /dev/nvme?n?p?; do
     ((INDEX++))
 done
 
-#====MSPLUGIN========#
+#====MSPLUGIN========
 
 wget https://resource.milesight.com/milesight/security/software/Milesight_Plugin_for_Network_Optix_2.0.12-r2-linux.zip -O plugin.zip && \
 unzip plugin.zip && \
